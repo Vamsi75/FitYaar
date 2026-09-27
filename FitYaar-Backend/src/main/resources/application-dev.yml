@@ -1,0 +1,12 @@
+server:
+  port: 2098
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/FitYaar
+    username: postgres
+    password: root
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate

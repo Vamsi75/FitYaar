@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FitYaar · Super Admin</title>
+  <style>
+    :root { color-scheme: dark; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+           margin: 0; background: #120e10; color: #eee; }
+    .wrap { max-width: 720px; margin: 0 auto; padding: 24px; }
+    h1 { color: #ff7043; }
+    .card { background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.12);
+            border-radius: 14px; padding: 16px; margin: 16px 0; }
+    h2 { margin: 0 0 12px; font-size: 16px; color: #ffb59d; }
+    label { display:block; font-size: 12px; color:#aaa; margin: 8px 0 2px; }
+    input { width: 100%; box-sizing: border-box; padding: 10px; border-radius: 8px;
+            border: 1px solid #444; background:#1b1518; color:#eee; }
+    button { background:#ff7043; color:#111; border:0; border-radius:8px; padding:10px 16px;
+             font-weight:600; cursor:pointer; margin-top:10px; }
+    button.ghost { background: rgba(255,112,67,.18); color:#ffb59d; border:1px solid #ff7043; }
+    .row { display:flex; gap:8px; } .row > * { flex:1; }
+    .muted { color:#888; font-size: 13px; }
+    table { width:100%; border-collapse: collapse; margin-top:8px; font-size: 14px; }
+    td, th { text-align:left; padding:6px 4px; border-bottom:1px solid #2a2226; }
+    code { background:#241a1e; padding:2px 6px; border-radius:6px; }
+    #msg { min-height: 20px; color:#ffb59d; }
+    .hidden { display:none; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>FitYaar · Super Admin</h1>
+    <p class="muted">Lite web console to manage gyms & admins. Point it at your API and sign in.</p>
+    <div id="msg"></div>
+
+    <div class="card">
+      <h2>1 · Connect & sign in</h2>
+      <label>API base URL</label>
+      <input id="base" value="http://localhost:2098" />
+      <label>Email</label>
+      <input id="email" placeholder="you@example.com" />
+      <label>Password</label>
+      <input id="password" type="password" />
+      <button onclick="login()">Sign in</button>
+    </div>
+
+    <div id="app" class="hidden">
+      <div class="card">
+        <h2>2 · Claim super-admin</h2>
+        <p class="muted">One-time: enter the super-admin code (server: <code>SUPER_ADMIN_CODE</code>, default <code>LETMEIN-SUPER</code>).</p>
+        <div class="row">
+          <input id="claimCode" placeholder="Super-admin code" />
+          <button class="ghost" onclick="claim()">Claim</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>3 · Create a gym</h2>
+        <div class="row">
+          <div><label>Name</label><input id="gName" placeholder="Iron Temple" /></div>
+          <div><label>Capacity</label><input id="gCap" type="number" value="100" /></div>
+        </div>
+        <div class="row">
+          <div><label>Join code (members)</label><input id="gJoin" placeholder="IRON123" /></div>
+          <div><label>Owner code (admins)</label><input id="gOwner" placeholder="OWNER123" /></div>
+        </div>
+        <button onclick="createGym()">Create gym</button>
+      </div>
+
+      <div class="card">
+        <h2>4 · Gyms</h2>
+        <button class="ghost" onclick="listGyms()">Refresh</button>
+        <div id="gyms"></div>
+      </div>
+
+      <div class="card">
+        <h2>5 · Gym billing (Pro seats)</h2>
+        <p class="muted">Set a gym's B2B plan. An <b>ACTIVE</b>, unexpired plan grants FitYaar Pro to
+          all that gym's active members. Collect payment offline, then mark it active here.</p>
+        <div class="row">
+          <div><label>Gym ID</label><input id="bGym" type="number" placeholder="1" /></div>
+          <div><label>Tier</label><input id="bTier" placeholder="STARTER / GROWTH / PRO_UNLIMITED" /></div>
+        </div>
+        <div class="row">
+          <div><label>Status</label>
+            <select id="bStatus">
+              <option value="ACTIVE">ACTIVE</option>
+              <option value="SUSPENDED">SUSPENDED</option>
+              <option value="EXPIRED">EXPIRED</option>
+              <option value="">(clear)</option>
+            </select>
+          </div>
+          <div><label>Paid seats</label><input id="bSeats" type="number" placeholder="50" /></div>
+        </div>
+        <label>Plan valid until (optional)</label>
+        <input id="bUntil" type="datetime-local" />
+        <div class="row">
+          <button onclick="setPlan()">Save plan</button>
+          <button class="ghost" onclick="checkSeats()">Check seat usage</button>
+        </div>
+        <div id="seats" class="muted"></div>
+      </div>
+
+      <div class="card">
+        <h2>6 · Grant Pro to a user</h2>
+        <p class="muted">Comp / influencer / support grant — creates a personal Pro subscription.</p>
+        <div class="row">
+          <div><label>User email</label><input id="grantEmail" placeholder="user@example.com" /></div>
+          <div><label>Plan</label>
+            <select id="grantPlan">
+              <option value="MONTHLY">MONTHLY</option>
+              <option value="YEARLY">YEARLY</option>
+              <option value="LIFETIME">LIFETIME</option>
+            </select>
+          </div>
+        </div>
+        <button onclick="grantPro()">Grant Pro</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let token = null;
+    const $ = (id) => document.getElementById(id);
+    const base = () => $('base').value.replace(/\/$/, '');
+    const msg = (t, ok) => { const m = $('msg'); m.textContent = t; m.style.color = ok ? '#8bc34a' : '#ffb59d'; };
+
+    async function api(path, { method = 'GET', body } = {}) {
+      const res = await fetch(base() + '/api' + path, {
+        method,
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) },
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      const text = await res.text();
+      const data = text ? JSON.parse(text) : null;
+      if (!res.ok) throw new Error((data && data.message) || ('HTTP ' + res.status));
+      return data;
+    }
+
+    async function login() {
+      try {
+        const d = await api('/auth/login', { method: 'POST', body: { email: $('email').value.trim(), password: $('password').value } });
+        token = d.accessToken;
+        $('app').classList.remove('hidden');
+        msg('Signed in as ' + d.user.email, true);
+        listGyms();
+      } catch (e) { msg('Login failed: ' + e.message); }
+    }
+    async function claim() {
+      try { await api('/admin/claim', { method: 'POST', body: { code: $('claimCode').value.trim() } }); msg('You are now super-admin.', true); listGyms(); }
+      catch (e) { msg('Claim failed: ' + e.message); }
+    }
+    async function createGym() {
+      try {
+        await api('/admin/gyms', { method: 'POST', body: {
+          name: $('gName').value.trim(), capacity: parseInt($('gCap').value || '0', 10),
+          joinCode: $('gJoin').value.trim(), ownerCode: $('gOwner').value.trim() } });
+        msg('Gym created.', true); listGyms();
+      } catch (e) { msg('Create failed: ' + e.message); }
+    }
+    async function listGyms() {
+      try {
+        const gyms = await api('/admin/gyms');
+        $('gyms').innerHTML = '<table><tr><th>ID</th><th>Name</th><th>Join</th><th>Owner</th><th>Cap</th><th>Plan</th><th>Assign admin</th></tr>' +
+          gyms.map(g => `<tr><td>${g.id}</td><td>${g.name}</td><td><code>${g.joinCode}</code></td><td><code>${g.ownerCode}</code></td><td>${g.capacity ?? ''}</td>
+            <td>${g.planStatus ? `<code>${g.planTier ?? '?'} · ${g.planStatus}</code>` : '<span class="muted">—</span>'}</td>
+            <td><input id="adm${g.id}" placeholder="email" style="width:150px"/> <button class="ghost" onclick="assign(${g.id})">Add</button></td></tr>`).join('') +
+          '</table>';
+      } catch (e) { msg('List failed: ' + e.message); }
+    }
+    async function assign(gymId) {
+      try { const email = $('adm' + gymId).value.trim(); await api('/admin/gyms/' + gymId + '/admins', { method: 'POST', body: { email } }); msg('Admin assigned to gym ' + gymId, true); }
+      catch (e) { msg('Assign failed: ' + e.message); }
+    }
+    async function setPlan() {
+      try {
+        const id = parseInt($('bGym').value, 10);
+        const until = $('bUntil').value;   // 'YYYY-MM-DDTHH:mm' (LocalDateTime) or ''
+        await api('/admin/gyms/' + id + '/plan', { method: 'POST', body: {
+          planTier: $('bTier').value.trim() || null,
+          planStatus: $('bStatus').value || null,
+          planCurrentPeriodEnd: until ? until : null,
+          paidSeats: $('bSeats').value ? parseInt($('bSeats').value, 10) : null } });
+        msg('Plan saved for gym ' + id, true); listGyms(); checkSeats();
+      } catch (e) { msg('Save plan failed: ' + e.message); }
+    }
+    async function checkSeats() {
+      try {
+        const id = parseInt($('bGym').value, 10);
+        const s = await api('/admin/gyms/' + id + '/seats');
+        $('seats').innerHTML = `Gym <b>${s.name}</b> — ${s.activeMembers} active / ${s.paidSeats ?? '∞'} paid seats · `
+          + `plan <code>${s.planTier ?? '—'} · ${s.planStatus ?? 'none'}</code>`
+          + (s.overCap ? ' · <span style="color:#ff5252">OVER CAP — upsell a higher tier</span>' : '');
+      } catch (e) { msg('Seats check failed: ' + e.message); }
+    }
+    async function grantPro() {
+      try {
+        const d = await api('/subscriptions/grant', { method: 'POST', body: {
+          email: $('grantEmail').value.trim(), plan: $('grantPlan').value } });
+        msg('Granted ' + d.plan + ' Pro to user ' + d.userId + ' (until ' + d.until + ')', true);
+      } catch (e) { msg('Grant failed: ' + e.message); }
+    }
+  </script>
+</body>
+</html>

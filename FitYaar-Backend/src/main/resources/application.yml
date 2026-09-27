@@ -1,0 +1,58 @@
+spring:
+  profiles:
+    active: dev
+  application:
+    name: fityaar-backend
+
+  jpa:
+    hibernate:
+      # Flyway owns the schema; Hibernate only validates entities match the migrated schema.
+      ddl-auto: validate
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+  flyway:
+    enabled: true
+    clean-disabled: true          # never allow an accidental wipe
+    locations: classpath:db/migration
+
+  jackson:
+    default-property-inclusion: non_null
+
+fityaar:
+  features:
+    nutrition: false   # Deferred to next release. Flip to true to expose /api/nutrition/**.
+
+app:
+  mail:
+    enabled: ${MAIL_ENABLED:false}   # false → member-update notifications are logged, not sent. Flip on with SMTP creds.
+    from: ${MAIL_FROM:no-reply@fityaar.app}
+  super-admin-code: ${SUPER_ADMIN_CODE:LETMEIN-SUPER}
+  google:
+    client-id: ${GOOGLE_CLIENT_ID:}
+  fcm:
+    enabled: ${FCM_ENABLED:false}   # false → push is logged, not sent. Needs a Firebase service account.
+    service-account-json: ${FCM_SERVICE_ACCOUNT_JSON:}   # raw service-account key JSON
+  promo:
+    codes: ${PROMO_CODES:}          # comma-separated codes that redeem to 1yr Pro (empty = promos off)
+  billing:
+    # Advisory ONLY — drives the management dashboard's estimated MRR. Key = gym plan_tier label,
+    # value = monthly price in paise. Real prices/limits land with the DB plan catalog (Milestone 6.6).
+    plan-prices-paise:
+      STARTER: 84000
+      GROWTH: 153000
+      PRO: 87000
+  payment:
+    enabled: ${PAYMENT_ENABLED:false}
+    razorpay-key-id: ${RAZORPAY_KEY_ID:}
+    razorpay-key-secret: ${RAZORPAY_KEY_SECRET:}
+    webhook-secret: ${RAZORPAY_WEBHOOK_SECRET:}
+  jwt:
+    secret: ${JWT_SECRET:change-me-in-prod-this-is-a-dev-only-256-bit-secret-value!!}
+    access-expiration-ms: 86400000      # 24 hours
+    refresh-expiration-ms: 604800000    # 7 days
+
+server:
+  port: 8080

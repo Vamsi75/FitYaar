@@ -1,0 +1,42 @@
+# === FitYaar monorepo .gitignore ===
+
+# --- Backend (Maven) ---
+/FitYaar-Backend/target/
+FitYaar-Backend/*.log
+
+# --- Mobile (Flutter) ---
+FitYaar-Mobile/.dart_tool/
+FitYaar-Mobile/.flutter-plugins
+FitYaar-Mobile/.flutter-plugins-dependencies
+FitYaar-Mobile/build/
+FitYaar-Mobile/**/generated_plugin_registrant.*
+FitYaar-Mobile/**/GeneratedPluginRegistrant.*
+FitYaar-Mobile/android/.gradle/
+FitYaar-Mobile/android/local.properties
+FitYaar-Mobile/android/app/debug/
+FitYaar-Mobile/android/app/profile/
+FitYaar-Mobile/android/app/release/
+FitYaar-Mobile/android/.kotlin/
+
+# --- Secrets / credentials (NEVER commit) ---
+**/google-services.json
+**/GoogleService-Info.plist
+**/*serviceAccount*.json
+**/*service-account*.json
+**/*firebase-adminsdk*.json
+**/*adminsdk*.json
+**/firebase_options.dart
+.env
+*.env
+
+# --- IDE ---
+.idea/
+*.iml
+.vscode/
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# --- Local DB migration snapshot (user data + password hashes — NEVER commit) ---
+/migration/

@@ -1,0 +1,282 @@
+{
+  "info": {
+    "name": "FitYaar API",
+    "description": "FitYaar backend API tests: Auth, Users, Workout. Nutrition is deferred to next release and hidden. Set baseUrl to your running instance (dev default: http://localhost:2098). Run the whole collection top-to-bottom; Register captures the JWT used by every protected request.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [ { "key": "token", "value": "{{accessToken}}", "type": "string" } ]
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:2098" },
+    { "key": "accessToken", "value": "" },
+    { "key": "refreshToken", "value": "" },
+    { "key": "runEmail", "value": "" },
+    { "key": "runPassword", "value": "password123" },
+    { "key": "exerciseId", "value": "1" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register (200 + tokens)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": { "type": "text/javascript", "exec": [
+                "pm.collectionVariables.set('runEmail', 'pm_' + Date.now() + '@fityaar.com');",
+                "pm.collectionVariables.set('runPassword', 'password123');"
+              ] }
+            },
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": [
+                "pm.test('status 200', () => pm.response.to.have.status(200));",
+                "const b = pm.response.json();",
+                "pm.test('has accessToken', () => pm.expect(b.accessToken).to.be.a('string').and.not.empty);",
+                "pm.test('user echoes email', () => pm.expect(b.user.email).to.eql(pm.collectionVariables.get('runEmail')));",
+                "pm.collectionVariables.set('accessToken', b.accessToken);",
+                "pm.collectionVariables.set('refreshToken', b.refreshToken);"
+              ] }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{runEmail}}\",\n  \"password\": \"{{runPassword}}\",\n  \"displayName\": \"Test Yaar\"\n}" },
+            "url": { "raw": "{{baseUrl}}/api/auth/register", "host": [ "{{baseUrl}}" ], "path": [ "api", "auth", "register" ] }
+          }
+        },
+        {
+          "name": "Login (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": [
+                "pm.test('status 200', () => pm.response.to.have.status(200));",
+                "const b = pm.response.json();",
+                "pm.test('has accessToken', () => pm.expect(b.accessToken).to.be.a('string').and.not.empty);",
+                "pm.collectionVariables.set('accessToken', b.accessToken);"
+              ] }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{runEmail}}\",\n  \"password\": \"{{runPassword}}\"\n}" },
+            "url": { "raw": "{{baseUrl}}/api/auth/login", "host": [ "{{baseUrl}}" ], "path": [ "api", "auth", "login" ] }
+          }
+        },
+        {
+          "name": "Login - wrong password (401)",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('status 401', () => pm.response.to.have.status(401));"
+            ] } }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{runEmail}}\",\n  \"password\": \"wrong-password\"\n}" },
+            "url": { "raw": "{{baseUrl}}/api/auth/login", "host": [ "{{baseUrl}}" ], "path": [ "api", "auth", "login" ] }
+          }
+        },
+        {
+          "name": "Register - duplicate email (409)",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('status 409', () => pm.response.to.have.status(409));"
+            ] } }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{runEmail}}\",\n  \"password\": \"{{runPassword}}\",\n  \"displayName\": \"Dup\"\n}" },
+            "url": { "raw": "{{baseUrl}}/api/auth/register", "host": [ "{{baseUrl}}" ], "path": [ "api", "auth", "register" ] }
+          }
+        },
+        {
+          "name": "Register - short password (400)",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('status 400', () => pm.response.to.have.status(400));",
+              "pm.test('reports password field error', () => pm.expect(pm.response.text()).to.include('password'));"
+            ] } }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"short_{{$randomInt}}@fityaar.com\",\n  \"password\": \"123\",\n  \"displayName\": \"Short\"\n}" },
+            "url": { "raw": "{{baseUrl}}/api/auth/register", "host": [ "{{baseUrl}}" ], "path": [ "api", "auth", "register" ] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Get Profile - no token (401)",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('status 401', () => pm.response.to.have.status(401));"
+            ] } }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/users/profile", "host": [ "{{baseUrl}}" ], "path": [ "api", "users", "profile" ] }
+          }
+        },
+        {
+          "name": "Get Profile (200)",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('status 200', () => pm.response.to.have.status(200));",
+              "pm.test('has displayName', () => pm.expect(pm.response.json().displayName).to.be.a('string'));"
+            ] } }
+          ],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/users/profile", "host": [ "{{baseUrl}}" ], "path": [ "api", "users", "profile" ] }
+          }
+        },
+        {
+          "name": "Update Profile (200)",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('status 200', () => pm.response.to.have.status(200));",
+              "pm.test('bio updated', () => pm.expect(pm.response.json().bio).to.eql('Fitness enthusiast from India'));"
+            ] } }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": { "mode": "raw", "raw": "{\n  \"displayName\": \"Test Yaar Updated\",\n  \"bio\": \"Fitness enthusiast from India\",\n  \"fitnessGoal\": \"MUSCLE_GAIN\",\n  \"currentWeight\": 75.5,\n  \"targetWeight\": 80,\n  \"height\": 178,\n  \"dailyCalorieGoal\": 2800,\n  \"dailyWaterGoal\": 3500,\n  \"isPublic\": true\n}" },
+            "url": { "raw": "{{baseUrl}}/api/users/profile", "host": [ "{{baseUrl}}" ], "path": [ "api", "users", "profile" ] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Workout",
+      "item": [
+        {
+          "name": "Search Exercises (200)",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('status 200', () => pm.response.to.have.status(200));",
+              "const arr = pm.response.json();",
+              "pm.test('is array', () => pm.expect(arr).to.be.an('array'));",
+              "if (arr.length) { pm.collectionVariables.set('exerciseId', arr[0].id); }"
+            ] } }
+          ],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/workout/exercises?query=bench", "host": [ "{{baseUrl}}" ], "path": [ "api", "workout", "exercises" ], "query": [ { "key": "query", "value": "bench" } ] }
+          }
+        },
+        {
+          "name": "Get Routine Templates (200)",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('status 200', () => pm.response.to.have.status(200));"
+            ] } }
+          ],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/workout/routines/templates", "host": [ "{{baseUrl}}" ], "path": [ "api", "workout", "routines", "templates" ] }
+          }
+        },
+        {
+          "name": "Create Routine (200)",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('status 200', () => pm.response.to.have.status(200));"
+            ] } }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Push Day\",\n  \"notes\": \"Chest, shoulders, triceps\",\n  \"isTemplate\": false,\n  \"exercises\": [\n    { \"exerciseId\": {{exerciseId}}, \"orderIndex\": 0, \"notes\": \"Warm up first\" }\n  ]\n}" },
+            "url": { "raw": "{{baseUrl}}/api/workout/routines", "host": [ "{{baseUrl}}" ], "path": [ "api", "workout", "routines" ] }
+          }
+        },
+        {
+          "name": "Get My Routines (200)",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('status 200', () => pm.response.to.have.status(200));"
+            ] } }
+          ],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/workout/routines", "host": [ "{{baseUrl}}" ], "path": [ "api", "workout", "routines" ] }
+          }
+        },
+        {
+          "name": "Start Session (200)",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('status 200', () => pm.response.to.have.status(200));"
+            ] } }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Morning Push\",\n  \"startTime\": \"2026-08-28T07:00:00\",\n  \"endTime\": \"2026-08-28T08:00:00\",\n  \"notes\": \"Felt strong\",\n  \"exercises\": [\n    {\n      \"exerciseId\": {{exerciseId}},\n      \"orderIndex\": 0,\n      \"notes\": \"\",\n      \"sets\": [\n        { \"orderIndex\": 0, \"weight\": 60, \"reps\": 10, \"rpe\": 8, \"type\": \"NORMAL\", \"isCompleted\": true },\n        { \"orderIndex\": 1, \"weight\": 60, \"reps\": 8, \"rpe\": 9, \"type\": \"NORMAL\", \"isCompleted\": true }\n      ]\n    }\n  ]\n}" },
+            "url": { "raw": "{{baseUrl}}/api/workout/sessions", "host": [ "{{baseUrl}}" ], "path": [ "api", "workout", "sessions" ] }
+          }
+        },
+        {
+          "name": "Get History (200)",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('status 200', () => pm.response.to.have.status(200));"
+            ] } }
+          ],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/workout/history", "host": [ "{{baseUrl}}" ], "path": [ "api", "workout", "history" ] }
+          }
+        },
+        {
+          "name": "Get PRs (200)",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('status 200', () => pm.response.to.have.status(200));"
+            ] } }
+          ],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/workout/prs", "host": [ "{{baseUrl}}" ], "path": [ "api", "workout", "prs" ] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Nutrition (hidden this release)",
+      "item": [
+        {
+          "name": "Food Search - hidden (404)",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('nutrition is hidden -> 404', () => pm.response.to.have.status(404));"
+            ] } }
+          ],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/nutrition/food/search?query=rice", "host": [ "{{baseUrl}}" ], "path": [ "api", "nutrition", "food", "search" ], "query": [ { "key": "query", "value": "rice" } ] }
+          }
+        }
+      ]
+    }
+  ]
+}

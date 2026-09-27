@@ -1,0 +1,76 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply font-sans text-white/90 antialiased;
+    min-height: 100vh;
+    /* Fixed warm-dark gradient mirroring the Flutter app shell. */
+    background-color: #0d0a0b;
+    background-image: linear-gradient(135deg, #241318 0%, #150f12 45%, #0d0a0b 100%);
+    background-attachment: fixed;
+  }
+
+  ::selection {
+    background: rgba(255, 111, 0, 0.35);
+  }
+}
+
+@layer components {
+  /* Frosted-glass surface — parity with GlassCard (blur 14, white 6–10% fill, 8% border, r18). */
+  .glass {
+    @apply rounded-glass border backdrop-blur-glass;
+    background-image: linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0.1),
+      rgba(255, 255, 255, 0.05)
+    );
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+
+  /* Glass button — parity with GlassButton (orange 16% fill, 45% border, r14, light-orange text). */
+  .glass-btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-pill border px-[18px] py-3 text-sm font-semibold transition;
+    color: #ffcc80;
+    background: rgba(255, 111, 0, 0.16);
+    border-color: rgba(255, 111, 0, 0.45);
+    backdrop-filter: blur(8px);
+  }
+  .glass-btn:hover {
+    background: rgba(255, 111, 0, 0.26);
+  }
+  .glass-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  /* Solid accent CTA for primary marketing actions. */
+  .accent-btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-pill px-5 py-3 text-sm font-semibold text-black transition;
+    background: linear-gradient(135deg, #ff7043, #ff6f00);
+  }
+  .accent-btn:hover {
+    filter: brightness(1.06);
+  }
+
+  .section {
+    @apply mx-auto w-full max-w-content px-5 sm:px-6;
+  }
+
+  .field {
+    @apply w-full rounded-pill border bg-white/5 px-4 py-3 text-sm text-white outline-none transition;
+    border-color: rgba(255, 255, 255, 0.12);
+  }
+  .field:focus {
+    border-color: rgba(255, 111, 0, 0.55);
+  }
+}

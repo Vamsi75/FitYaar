@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FitYaar Management</title>
+  <link rel="icon" type="image/png" href="/admin/assets/icon-small.png" />
+  <link rel="stylesheet" href="/admin/admin.css" />
+</head>
+<body>
+  <!-- Login view -->
+  <div id="login" class="login-wrap">
+    <div class="card login-card">
+      <div class="brand">
+        <img class="logo-img" src="/admin/assets/icon.png" alt="FitYaar" />
+        <div>
+          <h1>FitYaar Management</h1>
+          <div class="sub">Platform Operations &amp; Administration</div>
+        </div>
+      </div>
+      <div id="li-form">
+        <label>Email</label>
+        <input id="li-email" placeholder="you@example.com" autocomplete="username" />
+        <label>Password</label>
+        <input id="li-password" type="password" autocomplete="current-password" />
+        <div style="margin-top:14px"><button id="li-btn" style="width:100%">Sign in</button></div>
+        <div class="muted" style="font-size:12px; margin-top:12px; text-align:center">
+          Same FitYaar login as the app. This portal is for the platform super-admin only.
+        </div>
+      </div>
+
+      <div id="li-denied" class="hidden" style="margin-top:8px">
+        <div class="alertline"><span class="dot bad"></span>
+          <span>This account isn't a platform administrator.</span></div>
+        <div class="muted" style="font-size:12px; margin-top:8px">
+          FitYaar Management is restricted to the super-admin. Members, trainers and gym owners
+          use the FitYaar app — you're already signed in there with these same credentials.
+        </div>
+        <div style="margin-top:12px"><button class="ghost" id="li-back" style="width:100%">Use a different account</button></div>
+        <div style="margin-top:12px"><span id="li-claim-link" class="muted" style="font-size:12px; cursor:pointer; text-decoration:underline">I have a platform claim code →</span></div>
+        <div id="li-claim" class="hidden" style="margin-top:8px">
+          <div class="row">
+            <input id="li-code" placeholder="Super-admin code" />
+            <button class="ghost" id="li-claim-btn" style="flex:0 0 auto">Claim</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- App shell -->
+  <div id="app" class="shell hidden">
+    <aside class="sidebar">
+      <div class="brand">
+        <img class="logo-img" src="/admin/assets/icon.png" alt="FitYaar" />
+        <div><h1 style="font-size:16px">FitYaar</h1><div class="sub">Management</div></div>
+      </div>
+      <nav id="nav"></nav>
+    </aside>
+    <main class="main">
+      <div class="topbar">
+        <h2 id="page-title">Dashboard</h2>
+        <div class="grow"></div>
+        <div class="who" id="who"></div>
+        <button class="ghost sm" id="logout">Logout</button>
+      </div>
+      <div id="view"></div>
+    </main>
+  </div>
+
+  <div id="toast"></div>
+  <script src="/admin/admin.js"></script>
+</body>
+</html>

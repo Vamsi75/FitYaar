@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FitYaar Pro · Checkout</title>
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  <style>
+    :root { color-scheme: dark; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+           margin: 0; background: #120e10; color: #eee; display: grid; place-items: center; min-height: 100vh; }
+    .card { background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.12);
+            border-radius: 16px; padding: 28px; max-width: 420px; width: 90%; text-align: center; }
+    h1 { color: #ff7043; margin: 0 0 6px; font-size: 22px; }
+    .plan { font-size: 18px; font-weight: 700; margin: 14px 0 4px; }
+    .price { color: #ffb59d; font-size: 15px; }
+    .note { color: #999; font-size: 13px; margin-top: 18px; line-height: 1.5; }
+    .badge { display:inline-block; margin-top:16px; padding:6px 12px; border-radius: 20px;
+             background: rgba(255,112,67,.16); color:#ffb59d; font-size: 13px; }
+    .error { color: #ffb59d; margin-top: 12px; min-height: 20px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>FitYaar Pro</h1>
+    <div class="plan" id="planName">—</div>
+    <div class="price" id="planPrice"></div>
+    <div class="badge" id="status">Secure checkout</div>
+    <p class="note" id="message">Preparing your secure Razorpay checkout…</p>
+    <div class="error" id="error"></div>
+  </div>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const plan = (params.get('plan') || 'YEARLY').toUpperCase();
+    const backend = localStorage.getItem('fityaar_api_base') || 'http://localhost:2098';
+    const PLANS = {
+      MONTHLY: ['Monthly', '₹199 / month', 19900],
+      YEARLY: ['Yearly', '₹1,499 / year', 149900],
+      LIFETIME: ['Lifetime', '₹4,999 once', 499900],
+    };
+    const selected = PLANS[plan] || PLANS.YEARLY;
+    document.getElementById('planName').textContent = selected[0];
+    document.getElementById('planPrice').textContent = selected[1];
+
+    const setStatus = (label, message, isError = false) => {
+      const statusEl = document.getElementById('status');
+      const msgEl = document.getElementById('message');
+      const errorEl = document.getElementById('error');
+      statusEl.textContent = label;
+      msgEl.textContent = message;
+      errorEl.textContent = isError ? message : '';
+    };
+
+    async function createOrder() {
+      try {
+        const res = await fetch(`${backend}/api/payments/order`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ plan })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error((data && data.message) || 'Could not create Razorpay order');
+        }
+        if (!data.key || !data.orderId) {
+          throw new Error('Backend did not return a valid Razorpay order');
+        }
+        const options = {
+          key: data.key,
+          amount: data.amount,
+          currency: data.currency,
+          name: 'FitYaar Pro',
+          description: `FitYaar ${selected[0]} plan`,
+          order_id: data.orderId,
+          handler: async function (response) {
+            setStatus('Verifying payment', 'Checking the Razorpay signature with the backend…');
+            const verifyRes = await fetch(`${backend}/api/payments/verify`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({
+                orderId: response.razorpay_order_id,
+                paymentId: response.razorpay_payment_id,
+                signature: response.razorpay_signature,
+              })
+            });
+            const verifyData = await verifyRes.json();
+            if (!verifyRes.ok || !verifyData.verified) {
+              setStatus('Payment failed', 'Payment verification failed. Please try again.', true);
+              return;
+            }
+            setStatus('Payment successful', 'Your FitYaar subscription is being activated by the backend.', false);
+          },
+          theme: { color: '#ff7043' },
+          modal: { ondismiss: () => setStatus('Payment cancelled', 'The payment flow was cancelled. You can try again anytime.') }
+        };
+        const razorpay = new Razorpay(options);
+        razorpay.open();
+      } catch (error) {
+        setStatus('Checkout unavailable', error.message || 'Unable to start checkout.', true);
+      }
+    }
+
+    createOrder();
+  </script>
+</body>
+</html>
