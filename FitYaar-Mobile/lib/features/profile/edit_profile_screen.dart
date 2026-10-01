@@ -3,7 +3,6 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/network/api_client.dart';
-import '../../core/widgets/accent_button.dart';
 import 'profile_models.dart';
 import 'profile_service.dart';
 
@@ -247,7 +246,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     ],
                   ),
                 );
-                if (u != null && mounted) Navigator.pop(ctx, u);
+                if (u != null && ctx.mounted) Navigator.pop(ctx, u);
               },
             ),
             ListTile(

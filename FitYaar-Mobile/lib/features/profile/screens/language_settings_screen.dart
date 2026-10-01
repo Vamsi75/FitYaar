@@ -60,15 +60,19 @@ class _LanguageSettingsScreenState extends State<LanguageSettingsScreen> {
             TextButton(onPressed: _save, child: const Text('Save')),
         ],
       ),
-      body: ListView(
-        children: _languages
-            .map((lang) => RadioListTile<String>(
-                  title: Text(lang['name']!),
-                  value: lang['code']!,
-                  groupValue: _language,
-                  onChanged: (v) => setState(() => _language = v!),
-                ))
-            .toList(),
+      body: RadioGroup<String>(
+        groupValue: _language,
+        onChanged: (value) {
+          if (value != null) setState(() => _language = value);
+        },
+        child: ListView(
+          children: _languages
+              .map((lang) => RadioListTile<String>(
+                    title: Text(lang['name']!),
+                    value: lang['code']!,
+                  ))
+              .toList(),
+        ),
       ),
     );
   }

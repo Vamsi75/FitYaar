@@ -79,12 +79,18 @@ class _UnitSettingsScreenState extends State<UnitSettingsScreen> {
           padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
           child: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         ),
-        ...options.map((opt) => RadioListTile<String>(
-              title: Text(opt),
-              value: opt,
-              groupValue: current,
-              onChanged: onChanged,
-            )),
+        RadioGroup<String>(
+          groupValue: current,
+          onChanged: onChanged,
+          child: Column(
+            children: options
+                .map((opt) => RadioListTile<String>(
+                      title: Text(opt),
+                      value: opt,
+                    ))
+                .toList(),
+          ),
+        ),
         const Divider(),
       ],
     );

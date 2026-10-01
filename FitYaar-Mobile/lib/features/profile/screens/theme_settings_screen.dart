@@ -53,27 +53,27 @@ class _ThemeSettingsScreenState extends State<ThemeSettingsScreen> {
             TextButton(onPressed: _save, child: const Text('Save')),
         ],
       ),
-      body: ListView(
-        children: [
-          RadioListTile<String>(
-            title: const Text('Light'),
-            value: 'light',
-            groupValue: _theme,
-            onChanged: (v) => setState(() => _theme = v!),
-          ),
-          RadioListTile<String>(
-            title: const Text('Dark'),
-            value: 'dark',
-            groupValue: _theme,
-            onChanged: (v) => setState(() => _theme = v!),
-          ),
-          RadioListTile<String>(
-            title: const Text('System Default'),
-            value: 'system',
-            groupValue: _theme,
-            onChanged: (v) => setState(() => _theme = v!),
-          ),
-        ],
+      body: RadioGroup<String>(
+        groupValue: _theme,
+        onChanged: (value) {
+          if (value != null) setState(() => _theme = value);
+        },
+        child: ListView(
+          children: const [
+            RadioListTile<String>(
+              title: Text('Light'),
+              value: 'light',
+            ),
+            RadioListTile<String>(
+              title: Text('Dark'),
+              value: 'dark',
+            ),
+            RadioListTile<String>(
+              title: Text('System Default'),
+              value: 'system',
+            ),
+          ],
+        ),
       ),
     );
   }

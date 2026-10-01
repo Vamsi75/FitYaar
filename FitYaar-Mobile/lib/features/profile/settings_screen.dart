@@ -30,13 +30,6 @@ class SettingsScreen extends StatelessWidget {
   void _section(BuildContext c, String t, List<SettingsItem> items) =>
       _push(c, SettingsSectionScreen(title: t, items: items));
 
-  Future<void> _editProfile(BuildContext c) async {
-    try {
-      final p = await c.read<ProfileService>().getProfile();
-      if (c.mounted) _push(c, EditProfileScreen(current: p));
-    } catch (_) {}
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
