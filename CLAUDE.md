@@ -28,6 +28,11 @@ See `docs/roadmap.md`, `docs/architecture.md`, `docs/milestones.md`.
 - Backend: `mvn verify` (Testcontainers). Mobile: `flutter analyze` + the `*_flow_test.dart` suites.
 - Always run a real build/analyze after UI changes — the web CFE catches type errors the analyzer can miss.
 
+## Git workflow (trunk-based)
+- `feat/<topic>` / `fix/<topic>` from `master` → PR → CI green → squash-merge to `master`. No direct pushes to `master`, no `develop` branch.
+- Releases are annotated tags `vX.Y.Z` on `master` (semver from Conventional Commits). `release/x.y` only to hotfix a shipped version.
+- Use the `git-manager` agent (`.claude/agents/git-manager.md`) for push → CI → merge → release.
+
 ## Local machine notes (this dev box)
 - Terminal PATH lacks mvn/flutter/JDK21. Use: JDK21 `C:\Users\VamsiH\.jdks\ms-21.0.10`, Maven `C:\Program Files\IntelliJ IDEA 2025\plugins\maven\lib\maven3\bin\mvn.cmd`, Flutter `C:\Users\VamsiH\flutter\bin\flutter.bat`, psql `C:\Program Files\PostgreSQL\18\bin\psql.exe`. No Android SDK installed yet (USB device builds need it).
 

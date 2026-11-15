@@ -2,8 +2,9 @@ name: CI
 
 on:
   push:
-    # Feature/fix branches too, so they're checked before merging to master.
-    branches: [ master, 'feat/**', 'fix/**' ]
+    # Trunk-based: feat/** and fix/** -> PR -> master (CI green); releases are vX.Y.Z tags.
+    # release/** only exists to patch an already-shipped version.
+    branches: [ master, 'feat/**', 'fix/**', 'release/**' ]
   pull_request:
 
 jobs:
