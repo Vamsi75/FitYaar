@@ -139,6 +139,12 @@ class WorkoutSession {
   final List<WorkoutExerciseModel> exercises;
   final int? totalVolume;
 
+  /// FITYAAR, HEVY or STRONG (imported).
+  final String? source;
+
+  /// Watch data attached to this session, if any.
+  final HealthMetrics? healthMetrics;
+
   WorkoutSession({
     required this.id,
     this.name,
@@ -147,7 +153,11 @@ class WorkoutSession {
     this.notes,
     this.exercises = const [],
     this.totalVolume,
+    this.source,
+    this.healthMetrics,
   });
+
+  bool get isImported => source != null && source != 'FITYAAR';
 
   factory WorkoutSession.fromJson(Map<String, dynamic> j) => WorkoutSession(
         id: j['id'] as int,
@@ -159,6 +169,10 @@ class WorkoutSession {
             j['endTime'] != null ? DateTime.tryParse(j['endTime'] as String) : null,
         notes: j['notes'] as String?,
         totalVolume: j['totalVolume'] as int?,
+        source: j['source'] as String?,
+        healthMetrics: j['healthMetrics'] is Map<String, dynamic>
+            ? HealthMetrics.fromJson(j['healthMetrics'] as Map<String, dynamic>)
+            : null,
         exercises: (j['exercises'] as List?)
                 ?.map((e) =>
                     WorkoutExerciseModel.fromJson(e as Map<String, dynamic>))
@@ -255,4 +269,75 @@ class LoggedExercise {
   final Exercise exercise;
   final List<LoggedSet> sets;
   LoggedExercise(this.exercise, this.sets);
+}
+
+
+/// Heart rate / calories for a session, read from Health Connect or Apple Health.
+/// Mirrors the backend's WorkoutMetricsDto.
+class HealthMetrics {
+  final String? platform; // HEALTH_CONNECT | APPLE_HEALTH
+  final String? sourceName; // e.g. "Fitbit"
+  final int? avgHeartRate;
+  final int? maxHeartRate;
+  final int? minHeartRate;
+  final int? activeCalories;
+  /// Total (active + resting) kcal — Fitbit writes this instead of active calories.
+  final int? totalCalories;
+  final int? maxHrUsed;
+
+  /// Seconds in zones 1–5 (50–60 / 60–70 / 70–80 / 80–90 / 90+ % of HRmax).
+  final List<int> zoneSeconds;
+
+  /// [offsetSeconds, bpm] pairs, down-sampled.
+  final List<List<int>> heartRateSamples;
+
+  const HealthMetrics({
+    this.platform,
+    this.sourceName,
+    this.avgHeartRate,
+    this.maxHeartRate,
+    this.minHeartRate,
+    this.activeCalories,
+    this.totalCalories,
+    this.maxHrUsed,
+    this.zoneSeconds = const [],
+    this.heartRateSamples = const [],
+  });
+
+  bool get hasHeartRate => avgHeartRate != null;
+
+  String get platformLabel =>
+      platform == 'APPLE_HEALTH' ? 'Apple Health' : 'Health Connect';
+
+  factory HealthMetrics.fromJson(Map<String, dynamic> j) => HealthMetrics(
+        platform: j['platform'] as String?,
+        sourceName: j['sourceName'] as String?,
+        avgHeartRate: j['avgHeartRate'] as int?,
+        maxHeartRate: j['maxHeartRate'] as int?,
+        minHeartRate: j['minHeartRate'] as int?,
+        activeCalories: j['activeCalories'] as int?,
+        totalCalories: j['totalCalories'] as int?,
+        maxHrUsed: j['maxHrUsed'] as int?,
+        zoneSeconds: (j['zoneSeconds'] as List?)
+                ?.map((e) => (e as int?) ?? 0)
+                .toList() ??
+            const [],
+        heartRateSamples: (j['heartRateSamples'] as List?)
+                ?.map((e) => (e as List).map((v) => v as int).toList())
+                .toList() ??
+            const [],
+      );
+
+  Map<String, dynamic> toJson() => {
+        'platform': platform,
+        'sourceName': sourceName,
+        'avgHeartRate': avgHeartRate,
+        'maxHeartRate': maxHeartRate,
+        'minHeartRate': minHeartRate,
+        'activeCalories': activeCalories,
+        'totalCalories': totalCalories,
+        'maxHrUsed': maxHrUsed,
+        'zoneSeconds': zoneSeconds,
+        'heartRateSamples': heartRateSamples,
+      };
 }

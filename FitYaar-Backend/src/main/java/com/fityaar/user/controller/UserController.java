@@ -5,6 +5,8 @@ import com.fityaar.user.dto.EmailUpdateRequest;
 import com.fityaar.user.dto.PasswordChangeRequest;
 import com.fityaar.user.dto.ProfileRequest;
 import com.fityaar.user.dto.ProfileResponse;
+import com.fityaar.user.dto.SetPasswordRequest;
+import com.fityaar.user.dto.UserResponse;
 import com.fityaar.user.entity.User;
 import com.fityaar.user.service.UserService;
 import jakarta.validation.Valid;
@@ -19,6 +21,13 @@ import org.springframework.web.bind.annotation.*;
 public class UserController {
 
     private final UserService userService;
+
+    /** The signed-in user — same shape as the {@code user} in the login response. Lets
+     *  the app restore who's signed in on a cold start when it only has a stored token. */
+    @GetMapping("/me")
+    public ResponseEntity<UserResponse> me(@AuthenticationPrincipal UserPrincipal principal) {
+        return ResponseEntity.ok(userService.toUserResponse(userService.findById(principal.getId())));
+    }
 
     @GetMapping("/profile")
     public ResponseEntity<ProfileResponse> getProfile(@AuthenticationPrincipal UserPrincipal principal) {
@@ -38,6 +47,15 @@ public class UserController {
             @AuthenticationPrincipal UserPrincipal principal,
             @Valid @RequestBody PasswordChangeRequest request) {
         userService.changePassword(principal.getUser(), request.getCurrentPassword(), request.getNewPassword());
+        return ResponseEntity.noContent().build();
+    }
+
+    /** First password for an account created with Google sign-in. */
+    @PostMapping("/set-password")
+    public ResponseEntity<Void> setPassword(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @Valid @RequestBody SetPasswordRequest request) {
+        userService.setPassword(userService.findById(principal.getId()), request.getNewPassword());
         return ResponseEntity.noContent().build();
     }
 

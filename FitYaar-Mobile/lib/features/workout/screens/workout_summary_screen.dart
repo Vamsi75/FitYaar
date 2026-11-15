@@ -12,6 +12,9 @@ import '../../profile/profile_models.dart';
 import '../../profile/profile_service.dart';
 import '../active_workout_model.dart' show fmtWeight;
 import '../models/workout_models.dart';
+import '../share/share_workout_screen.dart';
+import '../share/workout_share_cards.dart';
+import '../widgets/heart_rate_card.dart';
 import '../workout_service.dart';
 
 typedef SummaryExtra = ({List<PrEvent> prs, String? gender, GoalProgress? goal});
@@ -22,11 +25,25 @@ class WorkoutSummaryScreen extends StatefulWidget {
   final String name;
   final Duration duration;
   final List<LoggedExercise> exercises;
+
+  /// The saved session + its exact window — used to pull heart rate / calories from the
+  /// watch (Health Connect / Apple Health) and attach them to the session.
+  final int? sessionId;
+  final DateTime? startTime;
+  final DateTime? endTime;
+
+  /// Watch readings captured during the workout and saved with it at finish.
+  final HealthMetrics? healthMetrics;
+
   const WorkoutSummaryScreen({
     super.key,
     required this.name,
     required this.duration,
     required this.exercises,
+    this.sessionId,
+    this.startTime,
+    this.endTime,
+    this.healthMetrics,
   });
 
   @override
@@ -36,10 +53,36 @@ class WorkoutSummaryScreen extends StatefulWidget {
 class _WorkoutSummaryScreenState extends State<WorkoutSummaryScreen> {
   late Future<SummaryExtra> _extra;
 
+  /// Latest watch readings (initial, or fetched by the heart-rate card) — for sharing.
+  HealthMetrics? _metrics;
+
   @override
   void initState() {
     super.initState();
+    _metrics = widget.healthMetrics;
     _extra = _load();
+  }
+
+  Future<void> _openShare(Map<String, double> intensity) async {
+    SummaryExtra? extra;
+    try {
+      extra = await _extra.timeout(const Duration(seconds: 3));
+    } catch (_) {}
+    if (!mounted) return;
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => ShareWorkoutScreen(
+        data: WorkoutShareData(
+          name: widget.name,
+          date: widget.startTime ?? DateTime.now(),
+          duration: widget.duration,
+          exercises: widget.exercises,
+          muscleIntensity: intensity,
+          gender: extra?.gender,
+          metrics: _metrics,
+          prs: extra?.prs ?? const [],
+        ),
+      ),
+    ));
   }
 
   Future<SummaryExtra> _load() async {
@@ -119,6 +162,11 @@ class _WorkoutSummaryScreenState extends State<WorkoutSummaryScreen> {
         automaticallyImplyLeading: false,
         title: const Text('Workout Complete'),
         actions: [
+          IconButton(
+            tooltip: 'Share',
+            icon: const Icon(Icons.ios_share),
+            onPressed: () => _openShare(intensity),
+          ),
           TextButton(
             onPressed: () => Navigator.of(context).popUntil((r) => r.isFirst),
             child: const Text('Done'),
@@ -143,6 +191,18 @@ class _WorkoutSummaryScreenState extends State<WorkoutSummaryScreen> {
             _stat(theme, _vol(volume), 'Volume'),
           ]),
           const SizedBox(height: 16),
+          if (widget.startTime != null && widget.endTime != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: WorkoutHeartRateCard(
+                sessionId: widget.sessionId,
+                start: widget.startTime,
+                end: widget.endTime,
+                initial: widget.healthMetrics,
+                autoFetch: true,
+                onMetrics: (m) => _metrics = m,
+              ),
+            ),
           FutureBuilder<SummaryExtra>(
             future: _extra,
             builder: (context, snap) {
@@ -226,6 +286,13 @@ class _WorkoutSummaryScreenState extends State<WorkoutSummaryScreen> {
           ),
           const SizedBox(height: 20),
           GlassButton(
+            icon: Icons.ios_share,
+            label: 'Share workout',
+            expand: true,
+            onPressed: () => _openShare(intensity),
+          ),
+          const SizedBox(height: 10),
+          GlassButton(
             icon: Icons.check,
             label: 'Done',
             expand: true,
@@ -242,9 +309,14 @@ class _WorkoutSummaryScreenState extends State<WorkoutSummaryScreen> {
     for (final s in working) {
       if (top == null || (s.weight ?? 0) > (top.weight ?? 0)) top = s;
     }
+    final bestReps = working.fold<int>(0, (a, s) => (s.reps ?? 0) > a ? (s.reps ?? 0) : a);
     final topStr = top == null
         ? '${working.length} sets'
-        : '${working.length} sets · top ${fmtWeight(top.weight ?? 0)}×${top.reps}';
+        : (top.weight ?? 0) > 0
+            ? '${working.length} sets · top ${fmtWeight(top.weight!)}×${top.reps}'
+            : bestReps > 0
+                ? '${working.length} sets · best $bestReps reps'
+                : '${working.length} sets';
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(children: [

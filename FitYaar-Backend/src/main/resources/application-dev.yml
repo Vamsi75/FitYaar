@@ -10,3 +10,12 @@ spring:
   jpa:
     hibernate:
       ddl-auto: validate
+
+app:
+  cors:
+    # Dev web origins: Next.js site (3000) + Flutter web app (5050).
+    allowed-origins: http://localhost:3000,http://localhost:5050
+  google:
+    # Web OAuth client of Firebase project fityaar-bc262 (public value, not a secret).
+    # The app must be built with the same ID: --dart-define=GOOGLE_SERVER_CLIENT_ID=...
+    client-id: ${GOOGLE_CLIENT_ID:24824331761-6l06j1frjvu1auhh0ql7s088mdpd2jd4.apps.googleusercontent.com}

@@ -98,6 +98,17 @@ public class UserService {
         userRepository.save(user);
     }
 
+    /** First password for a Google sign-up. Refused once a password exists (use change-password). */
+    @Transactional
+    public void setPassword(User user, String newPassword) {
+        if (user.isPasswordSet()) {
+            throw new IllegalStateException("This account already has a password. Use Change password instead.");
+        }
+        user.setPassword(passwordEncoder.encode(newPassword));
+        user.setPasswordSet(true);
+        userRepository.save(user);
+    }
+
     @Transactional
     public void updateEmail(User user, String newEmail, String password) {
         if (!passwordEncoder.matches(password, user.getPassword())) {
@@ -126,6 +137,7 @@ public class UserService {
                 .pro(ent.isPro())
                 .plan(ent.getPlan())
                 .until(ent.getUntil())
+                .hasPassword(user.isPasswordSet())
                 .build();
     }
 

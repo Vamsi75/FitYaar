@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
+import 'core/health/health_sync_service.dart';
 import 'core/network/api_client.dart';
 import 'core/push/push_messaging.dart';
 import 'core/storage/token_storage.dart';
@@ -61,6 +62,9 @@ class FitYaarApp extends StatelessWidget {
         ),
         Provider<SocialService>(
           create: (ctx) => SocialService(ctx.read<ApiClient>()),
+        ),
+        ChangeNotifierProvider<HealthSyncService>(
+          create: (_) => HealthSyncService()..load(),
         ),
         ChangeNotifierProvider<ActiveWorkoutModel>(
           create: (ctx) => ActiveWorkoutModel(ctx.read<WorkoutService>()),

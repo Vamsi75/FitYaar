@@ -22,6 +22,10 @@ public class WorkoutSessionResponse {
     private String notes;
     private List<WorkoutExerciseResponse> exercises;
     private Integer totalVolume;
+    /** FITYAAR | HEVY | STRONG */
+    private String source;
+    /** Wearable data (heart rate, zones, calories) when the app attached some. */
+    private WorkoutMetricsDto healthMetrics;
 
     @Data
     @Builder

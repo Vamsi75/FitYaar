@@ -1,0 +1,207 @@
+-- Integrations slice 1+2:
+--   (a) CSV import from Hevy / Strong  → workout_sessions.source + exercise_aliases
+--   (b) wearable data (Health Connect / Apple Health) per session → workout_session_metrics
+
+-- (a) Where a session came from. Existing rows were all logged in FitYaar.
+ALTER TABLE workout_sessions ADD COLUMN source VARCHAR(20) NOT NULL DEFAULT 'FITYAAR';
+
+-- Duplicate detection on re-import looks sessions up by (user, start_time).
+CREATE INDEX IF NOT EXISTS idx_workout_sessions_user_start ON workout_sessions (user_id, start_time);
+
+-- Maps exercise names used by other apps onto the FitYaar catalog.
+-- alias_key is the normalized name: lower-case, every non-alphanumeric run → one space, trimmed
+-- (must match ExerciseNameNormalizer.normalize in Java).
+CREATE TABLE exercise_aliases (
+    id BIGSERIAL PRIMARY KEY,
+    alias_key VARCHAR(255) NOT NULL UNIQUE,
+    exercise_id BIGINT NOT NULL REFERENCES exercises(id) ON DELETE CASCADE
+);
+
+-- Seed common Hevy / Strong names. Joined on catalog name, so a name that isn't in the
+-- catalog simply inserts nothing (the importer then falls back to fuzzy matching).
+INSERT INTO exercise_aliases (alias_key, exercise_id)
+SELECT trim(BOTH ' ' FROM regexp_replace(lower(a.alias), '[^a-z0-9]+', ' ', 'g')), e.id
+FROM (VALUES
+    ('Bench Press (Barbell)',              'Barbell Bench Press - Medium Grip'),
+    ('Bench Press (Dumbbell)',             'Dumbbell Bench Press'),
+    ('Incline Bench Press (Barbell)',      'Barbell Incline Bench Press - Medium Grip'),
+    ('Incline Bench Press (Dumbbell)',     'Incline Dumbbell Press'),
+    ('Incline Bench Press (Smith Machine)','Smith Machine Incline Bench Press'),
+    ('Decline Bench Press (Barbell)',      'Decline Barbell Bench Press'),
+    ('Decline Bench Press (Dumbbell)',     'Decline Dumbbell Bench Press'),
+    ('Close Grip Bench Press (Barbell)',   'Close-Grip Barbell Bench Press'),
+    ('Squat (Barbell)',                    'Barbell Squat'),
+    ('Full Squat',                         'Barbell Full Squat'),
+    ('Squat (Bodyweight)',                 'Bodyweight Squat'),
+    ('Air Squat',                          'Bodyweight Squat'),
+    ('Squat (Dumbbell)',                   'Dumbbell Squat'),
+    ('Front Squat (Barbell)',              'Front Squat (Clean Grip)'),
+    ('Front Squat',                        'Front Squat (Clean Grip)'),
+    ('Goblet Squat (Kettlebell)',          'Goblet Squat'),
+    ('Goblet Squat (Dumbbell)',            'Goblet Squat'),
+    ('Box Squat (Barbell)',                'Box Squat'),
+    ('Hack Squat (Barbell)',               'Barbell Hack Squat'),
+    ('Deadlift (Barbell)',                 'Barbell Deadlift'),
+    ('Deadlift',                           'Barbell Deadlift'),
+    ('Romanian Deadlift (Barbell)',        'Romanian Deadlift'),
+    ('Romanian Deadlift (Dumbbell)',       'Stiff-Legged Dumbbell Deadlift'),
+    ('Stiff Leg Deadlift (Barbell)',       'Stiff-Legged Barbell Deadlift'),
+    ('Sumo Deadlift (Barbell)',            'Sumo Deadlift'),
+    ('Deficit Deadlift (Barbell)',         'Deficit Deadlift'),
+    ('Overhead Press (Barbell)',           'Standing Military Press'),
+    ('Military Press (Barbell)',           'Standing Military Press'),
+    ('Shoulder Press (Barbell)',           'Barbell Shoulder Press'),
+    ('Seated Overhead Press (Barbell)',    'Barbell Shoulder Press'),
+    ('Overhead Press (Dumbbell)',          'Dumbbell Shoulder Press'),
+    ('Shoulder Press (Dumbbell)',          'Dumbbell Shoulder Press'),
+    ('Seated Overhead Press (Dumbbell)',   'Dumbbell Shoulder Press'),
+    ('Shoulder Press (Machine)',           'Leverage Shoulder Press'),
+    ('Shoulder Press (Cable)',             'Cable Shoulder Press'),
+    ('Arnold Press (Dumbbell)',            'Arnold Dumbbell Press'),
+    ('Arnold Press',                       'Arnold Dumbbell Press'),
+    ('Lateral Raise (Dumbbell)',           'Side Lateral Raise'),
+    ('Lateral Raise (Cable)',              'Cable Seated Lateral Raise'),
+    ('Lateral Raise (Band)',               'Lateral Raise - With Bands'),
+    ('Seated Lateral Raise (Dumbbell)',    'Seated Side Lateral Raise'),
+    ('Bent Over Row (Barbell)',            'Bent Over Barbell Row'),
+    ('Barbell Row',                        'Bent Over Barbell Row'),
+    ('Bent Over Row (Dumbbell)',           'Bent Over Two-Dumbbell Row'),
+    ('Dumbbell Row',                       'One-Arm Dumbbell Row'),
+    ('Single Arm Dumbbell Row',            'One-Arm Dumbbell Row'),
+    ('Bent Over One Arm Row (Dumbbell)',   'One-Arm Dumbbell Row'),
+    ('Bent Over Row (Smith Machine)',      'Smith Machine Bent Over Row'),
+    ('Lat Pulldown (Cable)',               'Wide-Grip Lat Pulldown'),
+    ('Lat Pulldown (Machine)',             'Wide-Grip Lat Pulldown'),
+    ('Lat Pulldown - Close Grip (Cable)',  'V-Bar Pulldown'),
+    ('Single Arm Lat Pulldown',            'One Arm Lat Pulldown'),
+    ('Straight Arm Lat Pulldown (Cable)',  'Straight-Arm Pulldown'),
+    ('Seated Cable Row - V Grip (Cable)',  'Seated Cable Rows'),
+    ('Seated Row (Cable)',                 'Seated Cable Rows'),
+    ('Seated Cable Row',                   'Seated Cable Rows'),
+    ('Upright Row (Cable)',                'Upright Cable Row'),
+    ('Pull Up',                            'Pullups'),
+    ('Pull Up (Weighted)',                 'Pullups'),
+    ('Pull Up (Assisted)',                 'Band Assisted Pull-Up'),
+    ('Pull Up (Band)',                     'Band Assisted Pull-Up'),
+    ('Chin Up',                            'Chin-Up'),
+    ('Chin Up (Weighted)',                 'Chin-Up'),
+    ('Push Up',                            'Pushups'),
+    ('Push Up (Weighted)',                 'Pushups'),
+    ('Incline Push Up',                    'Incline Push-Up'),
+    ('Decline Push Up',                    'Decline Push-Up'),
+    ('Wide Grip Push Up',                  'Push-Up Wide'),
+    ('Bicep Curl (Barbell)',               'Barbell Curl'),
+    ('Curl (Barbell)',                     'Barbell Curl'),
+    ('Bicep Curl (Dumbbell)',              'Dumbbell Bicep Curl'),
+    ('Curl (Dumbbell)',                    'Dumbbell Bicep Curl'),
+    ('Seated Bicep Curl (Dumbbell)',       'Seated Dumbbell Curl'),
+    ('Incline Curl (Dumbbell)',            'Incline Dumbbell Curl'),
+    ('Hammer Curl (Dumbbell)',             'Hammer Curls'),
+    ('Hammer Curl (Cable)',                'Cable Hammer Curls - Rope Attachment'),
+    ('Reverse Curl (Barbell)',             'Reverse Barbell Curl'),
+    ('Preacher Curl (Barbell)',            'Preacher Curl'),
+    ('Preacher Curl (EZ Bar)',             'Preacher Curl'),
+    ('Preacher Curl (Machine)',            'Machine Preacher Curls'),
+    ('Preacher Curl (Cable)',              'Cable Preacher Curl'),
+    ('Triceps Pushdown',                   'Triceps Pushdown'),
+    ('Triceps Pushdown (Cable)',           'Triceps Pushdown'),
+    ('Triceps Pushdown (Cable - Straight Bar)', 'Triceps Pushdown'),
+    ('Triceps Rope Pushdown',              'Triceps Pushdown - Rope Attachment'),
+    ('Triceps Pushdown (Cable - Rope)',    'Triceps Pushdown - Rope Attachment'),
+    ('Reverse Grip Triceps Pushdown',      'Reverse Grip Triceps Pushdown'),
+    ('Skullcrusher (Barbell)',             'EZ-Bar Skullcrusher'),
+    ('Skullcrusher (EZ Bar)',              'EZ-Bar Skullcrusher'),
+    ('Lying Triceps Extension (Barbell)',  'EZ-Bar Skullcrusher'),
+    ('Leg Press (Machine)',                'Leg Press'),
+    ('Leg Press',                          'Leg Press'),
+    ('Leg Press (Smith Machine)',          'Smith Machine Leg Press'),
+    ('Leg Extension (Machine)',            'Leg Extensions'),
+    ('Leg Extension',                      'Leg Extensions'),
+    ('Single Leg Extension (Machine)',     'Single-Leg Leg Extension'),
+    ('Lying Leg Curl (Machine)',           'Lying Leg Curls'),
+    ('Leg Curl (Lying)',                   'Lying Leg Curls'),
+    ('Seated Leg Curl (Machine)',          'Seated Leg Curl'),
+    ('Leg Curl (Seated)',                  'Seated Leg Curl'),
+    ('Standing Leg Curl (Machine)',        'Standing Leg Curl'),
+    ('Standing Calf Raise (Machine)',      'Standing Calf Raises'),
+    ('Standing Calf Raise',                'Standing Calf Raises'),
+    ('Calf Raise (Standing)',              'Standing Calf Raises'),
+    ('Seated Calf Raise (Machine)',        'Seated Calf Raise'),
+    ('Seated Calf Raise',                  'Seated Calf Raise'),
+    ('Calf Raise (Smith Machine)',         'Smith Machine Calf Raise'),
+    ('Calf Press (Machine)',               'Calf Press On The Leg Press Machine'),
+    ('Hip Thrust (Barbell)',               'Barbell Hip Thrust'),
+    ('Hip Thrust',                         'Barbell Hip Thrust'),
+    ('Bulgarian Split Squat',              'Split Squat with Dumbbells'),
+    ('Bulgarian Split Squat (Dumbbell)',   'Split Squat with Dumbbells'),
+    ('Split Squat (Dumbbell)',             'Split Squat with Dumbbells'),
+    ('Split Squat',                        'Split Squats'),
+    ('Lunge (Dumbbell)',                   'Dumbbell Lunges'),
+    ('Lunge (Barbell)',                    'Barbell Lunge'),
+    ('Reverse Lunge (Dumbbell)',           'Dumbbell Rear Lunge'),
+    ('Plank',                              'Plank'),
+    ('Crunch',                             'Crunches'),
+    ('Crunches',                           'Crunches'),
+    ('Hanging Leg Raise',                  'Hanging Leg Raise'),
+    ('Lying Leg Raise',                    'Flat Bench Lying Leg Raise'),
+    ('Russian Twist',                      'Russian Twist'),
+    ('Russian Twist (Weighted)',           'Russian Twist'),
+    ('Ab Wheel',                           'Barbell Ab Rollout - On Knees'),
+    ('Face Pull (Cable)',                  'Face Pull'),
+    ('Face Pull',                          'Face Pull'),
+    ('Chest Fly (Dumbbell)',               'Dumbbell Flyes'),
+    ('Fly (Dumbbell)',                     'Dumbbell Flyes'),
+    ('Dumbbell Fly',                       'Dumbbell Flyes'),
+    ('Chest Fly (Machine)',                'Butterfly'),
+    ('Pec Deck (Machine)',                 'Butterfly'),
+    ('Butterfly (Pec Deck)',               'Butterfly'),
+    ('Rear Delt Fly (Dumbbell)',           'Reverse Flyes'),
+    ('Reverse Fly (Dumbbell)',             'Reverse Flyes'),
+    ('Cable Crossover',                    'Cable Crossover'),
+    ('Cable Fly Crossovers',               'Cable Crossover'),
+    ('Cable Fly',                          'Cable Crossover'),
+    ('Low Cable Fly Crossovers',           'Low Cable Crossover'),
+    ('Incline Cable Fly',                  'Incline Cable Flye'),
+    ('Chest Dip',                          'Parallel Bar Dip'),
+    ('Triceps Dip',                        'Parallel Bar Dip'),
+    ('Dip',                                'Parallel Bar Dip'),
+    ('Bench Dip',                          'Bench Dips'),
+    ('Shrug (Dumbbell)',                   'Dumbbell Shrug'),
+    ('Shrug (Barbell)',                    'Barbell Shrug'),
+    ('Shrug (Cable)',                      'Cable Shrugs'),
+    ('Running',                            'Running, Treadmill'),
+    ('Treadmill',                          'Running, Treadmill'),
+    ('Treadmill Running',                  'Running, Treadmill'),
+    ('Walking',                            'Walking, Treadmill'),
+    ('Cycling',                            'Bicycling'),
+    ('Stationary Bike',                    'Bicycling, Stationary'),
+    ('Spinning',                           'Bicycling, Stationary'),
+    ('Rowing Machine',                     'Rowing, Stationary'),
+    ('Rowing (Machine)',                   'Rowing, Stationary'),
+    ('Elliptical Trainer',                 'Elliptical Trainer'),
+    ('Elliptical',                         'Elliptical Trainer'),
+    ('Jump Rope',                          'Rope Jumping'),
+    ('Skipping',                           'Rope Jumping')
+) AS a(alias, target)
+JOIN exercises e ON e.name = a.target AND (e.is_custom = FALSE OR e.is_custom IS NULL)
+ON CONFLICT (alias_key) DO NOTHING;
+
+-- (b) Wearable data attached to a logged session (one row per session, upserted by the app).
+CREATE TABLE workout_session_metrics (
+    session_id BIGINT PRIMARY KEY REFERENCES workout_sessions(id) ON DELETE CASCADE,
+    platform VARCHAR(30),            -- HEALTH_CONNECT | APPLE_HEALTH
+    source_name VARCHAR(255),        -- e.g. "Fitbit", "Galaxy Watch", "Apple Watch"
+    avg_heart_rate INTEGER,
+    max_heart_rate INTEGER,
+    min_heart_rate INTEGER,
+    active_calories INTEGER,
+    max_hr_used INTEGER,             -- the HRmax the zones were computed against
+    zone1_seconds INTEGER,           -- 50–60% HRmax
+    zone2_seconds INTEGER,           -- 60–70%
+    zone3_seconds INTEGER,           -- 70–80%
+    zone4_seconds INTEGER,           -- 80–90%
+    zone5_seconds INTEGER,           -- 90%+
+    heart_rate_samples TEXT,         -- JSON [[offsetSeconds, bpm], ...], down-sampled for charts
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL
+);

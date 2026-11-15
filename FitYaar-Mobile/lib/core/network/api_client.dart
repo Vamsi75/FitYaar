@@ -51,6 +51,31 @@ class ApiClient {
   Future<dynamic> delete(String path, {Object? body, bool auth = true}) =>
       _send('DELETE', path, body: body, auth: auth);
 
+  /// Uploads one file as multipart/form-data (field [field]); [query] goes on the URL.
+  Future<dynamic> postMultipart(
+    String path, {
+    required List<int> bytes,
+    required String filename,
+    String field = 'file',
+    Map<String, String>? query,
+  }) async {
+    Future<http.Response> send() async {
+      var uri = _uri(path);
+      if (query != null && query.isNotEmpty) {
+        uri = uri.replace(queryParameters: {...uri.queryParameters, ...query});
+      }
+      final req = http.MultipartRequest('POST', uri)
+        ..files.add(http.MultipartFile.fromBytes(field, bytes, filename: filename));
+      final token = await _tokenStorage.getAccessToken();
+      if (token != null) req.headers['Authorization'] = 'Bearer $token';
+      return http.Response.fromStream(await _http.send(req));
+    }
+
+    var res = await send();
+    if (res.statusCode == 401 && await _tryRefresh()) res = await send();
+    return _handle(res);
+  }
+
   Future<dynamic> _send(String method, String path, {Object? body, bool auth = true}) async {
     var res = await _raw(method, path, body: body, auth: auth);
     // On an expired access token, try one refresh + retry (but never for /auth/*).

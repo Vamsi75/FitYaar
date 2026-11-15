@@ -21,4 +21,6 @@ public class UserResponse {
     private boolean pro;
     private String plan;         // MONTHLY | YEARLY | LIFETIME | gym tier; null when free
     private LocalDateTime until; // null = no expiry (LIFETIME / gym plan) or free
+    /** False for Google sign-ups that haven't chosen a password yet. */
+    private boolean hasPassword;
 }

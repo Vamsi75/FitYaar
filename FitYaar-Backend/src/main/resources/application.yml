@@ -21,6 +21,12 @@ spring:
   jackson:
     default-property-inclusion: non_null
 
+  servlet:
+    multipart:
+      # Hevy / Strong CSV exports (a few years of history is a few MB).
+      max-file-size: 20MB
+      max-request-size: 21MB
+
 fityaar:
   features:
     nutrition: false   # Deferred to next release. Flip to true to expose /api/nutrition/**.

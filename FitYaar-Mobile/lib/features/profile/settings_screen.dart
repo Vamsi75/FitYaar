@@ -1,20 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/widgets/glass_button.dart';
+import '../../core/health/health_sync_service.dart';
 import '../auth/auth_provider.dart';
+import '../workout/import/import_workouts_screen.dart';
 import 'edit_profile_screen.dart';
 import 'profile_service.dart';
 import 'screens/change_password_screen.dart';
 import 'screens/coming_soon_screen.dart';
 import 'screens/delete_account_screen.dart';
 import 'screens/go_pro_screen.dart';
+import 'screens/health_connection_screen.dart';
 import 'screens/language_settings_screen.dart';
 import 'screens/notification_settings_screen.dart';
 import 'screens/privacy_settings_screen.dart';
 import 'screens/settings_section_screen.dart';
-import 'screens/theme_settings_screen.dart';
 import 'screens/unit_settings_screen.dart';
 import 'screens/update_email_screen.dart';
 
@@ -48,7 +49,10 @@ class SettingsScreen extends StatelessWidget {
               SettingsItem('Edit profile',
                   icon: Icons.edit_outlined,
                   onTap: () => _push(context, EditProfileScreen(current: profile))),
-              SettingsItem('Change password',
+              SettingsItem(
+                  (context.read<AuthProvider>().user?.hasPassword ?? true)
+                      ? 'Change password'
+                      : 'Set a password',
                   icon: Icons.password,
                   onTap: () => _push(context, const ChangePasswordScreen())),
               SettingsItem('Update email',
@@ -83,29 +87,24 @@ class SettingsScreen extends StatelessWidget {
             _push(context, LanguageSettingsScreen(current: profile));
           }),
           _tile(context, Icons.extension_outlined, 'Integrations', () {
+            final health = context.read<HealthSyncService>();
             _section(context, 'Integrations', [
+              SettingsItem(health.storeName,
+                  icon: Icons.favorite_border,
+                  onTap: () => _push(context, const HealthConnectionScreen())),
+              // Fitbit (incl. Pixel Watch / Fitbit Air) reaches FitYaar through the phone's
+              // health store, so it routes to the same screen.
+              SettingsItem('Fitbit / smartwatch',
+                  icon: Icons.watch,
+                  onTap: () => _push(context, const HealthConnectionScreen())),
+              SettingsItem('Import from Hevy / Strong',
+                  icon: Icons.upload_file,
+                  onTap: () => _push(context, const ImportWorkoutsScreen())),
               SettingsItem('Strava',
                   icon: Icons.directions_run,
                   onTap: () => _soon(context, 'Strava',
                       note: 'Sync your Strava runs and rides automatically.')),
-              SettingsItem('Fitbit',
-                  icon: Icons.watch,
-                  onTap: () => _soon(context, 'Fitbit',
-                      note: 'Import your steps and sleep data from Fitbit.')),
-              SettingsItem('Google Fit',
-                  icon: Icons.fitness_center,
-                  onTap: () => _soon(context, 'Google Fit',
-                      note: 'Sync health data with Google Fit.')),
-              SettingsItem('Apple Health',
-                  icon: Icons.favorite_border,
-                  onTap: () => _soon(context, 'Apple Health',
-                      note: 'Sync health data with Apple Health.')),
             ]);
-          }),
-          _tile(context, Icons.palette_outlined, 'Theme', () async {
-            final profile = await context.read<ProfileService>().getProfile();
-            if (!context.mounted) return;
-            _push(context, ThemeSettingsScreen(current: profile));
           }),
           _tile(context, Icons.import_export, 'Data', () {
             _section(context, 'Data', [
@@ -113,10 +112,9 @@ class SettingsScreen extends StatelessWidget {
                   icon: Icons.download,
                   onTap: () =>
                       _soon(context, 'Export Data', note: 'Download all your workout and nutrition history.')),
-              SettingsItem('Import data',
+              SettingsItem('Import workouts (Hevy / Strong)',
                   icon: Icons.upload,
-                  onTap: () => _soon(context, 'Import Data',
-                      note: 'Import historical data from other fitness apps.')),
+                  onTap: () => _push(context, const ImportWorkoutsScreen())),
             ]);
           }),
 
@@ -157,17 +155,6 @@ class SettingsScreen extends StatelessWidget {
           }),
           _tile(context, Icons.groups_outlined, 'Community',
               () => _soon(context, 'Community', note: 'Join challenges and connect with other members.')),
-          // Required attribution for the free Flaticon animated-icon pack.
-          ListTile(
-            leading: const Icon(Icons.animation_outlined),
-            title: const Text('Icon credits'),
-            subtitle: const Text('Weight animated icons by Magnific — Flaticon',
-                style: TextStyle(fontSize: 12, color: Colors.white54)),
-            trailing: const Icon(Icons.open_in_new, size: 18),
-            onTap: () => launchUrl(
-                Uri.parse('https://www.flaticon.com/free-animated-icons/weight'),
-                mode: LaunchMode.externalApplication),
-          ),
 
           Padding(
             padding: const EdgeInsets.all(16),

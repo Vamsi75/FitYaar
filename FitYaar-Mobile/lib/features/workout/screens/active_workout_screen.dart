@@ -4,11 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/health/health_sync_service.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/accent_button.dart';
 import '../../../core/widgets/anim_icon.dart';
 import '../../../core/widgets/glass_button.dart';
+import '../../profile/profile_service.dart';
 import '../active_workout_model.dart';
 import '../metric_spec.dart';
 import '../models/workout_models.dart';
@@ -191,6 +193,8 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       return;
     }
     final service = context.read<WorkoutService>();
+    final health = context.read<HealthSyncService>();
+    final profiles = context.read<ProfileService>();
     final name = await _askName(model.defaultName(), model.isEditing);
     if (name == null) return;
 
@@ -204,13 +208,28 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     final addedCount = model.addedExerciseIds().length;
     final currentIds = model.currentExerciseIds();
     final routineName = model.title;
+    final endedAt = DateTime.now();
     try {
+      WorkoutSession? saved;
+      HealthMetrics? metrics;
       if (editingId != null) {
         await service.updateSession(
             sessionId: editingId, name: name, startTime: startedAt, exercises: logged);
       } else {
-        await service.finishSession(
-            name: name, startTime: startedAt, exercises: logged);
+        // One read of the watch data for the exact workout window, alongside the save.
+        final reading = _readWatch(health, profiles, startedAt, endedAt);
+        saved = await service.finishSession(
+            name: name, startTime: startedAt, endTime: endedAt, exercises: logged);
+        metrics = await reading;
+        if (metrics != null) {
+          try {
+            metrics = await service.saveHealthMetrics(saved.id, metrics);
+          } catch (e) {
+            debugPrint('Saving watch readings failed: $e'); // summary card retries
+          }
+        }
+        // Mirror the workout into Health Connect / Apple Health (best-effort, no await).
+        unawaited(health.writeWorkout(start: startedAt, end: endedAt, title: name));
       }
 
       // Started from a routine and added exercises? Offer to sync the routine.
@@ -240,7 +259,13 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
         // Replace the active screen with the celebration/recap.
         Navigator.of(context).pushReplacement(MaterialPageRoute(
           builder: (_) => WorkoutSummaryScreen(
-              name: name, duration: elapsed, exercises: logged),
+              name: name,
+              duration: elapsed,
+              exercises: logged,
+              sessionId: saved?.id,
+              startTime: startedAt,
+              endTime: endedAt,
+              healthMetrics: metrics),
         ));
       }
     } on ApiException catch (e) {
@@ -252,6 +277,33 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       setState(() => _saving = false);
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('Could not save workout.')));
+    }
+  }
+
+  /// Heart rate + calories for [start]–[end] from Health Connect / Apple Health, or
+  /// null when not connected or nothing has synced yet (the summary card then keeps
+  /// checking for a few minutes — watches often sync a little after the workout).
+  static Future<HealthMetrics?> _readWatch(HealthSyncService health,
+      ProfileService profiles, DateTime start, DateTime end) async {
+    if (!health.isSupported) return null;
+    await health.load();
+    if (!health.isConnected) return null;
+    int? age;
+    try {
+      final b = (await profiles.getProfile().timeout(const Duration(seconds: 3))).birthday;
+      if (b != null) {
+        age = start.year - b.year;
+        if (start.month < b.month || (start.month == b.month && start.day < b.day)) age--;
+      }
+    } catch (_) {}
+    try {
+      await health.ensurePermissions();
+      return await health
+          .readWorkoutMetrics(start, end, age: age)
+          .timeout(const Duration(seconds: 8));
+    } catch (e) {
+      debugPrint('Watch read at finish failed: $e');
+      return null;
     }
   }
 
@@ -915,3 +967,4 @@ class _SetBadge extends StatelessWidget {
     );
   }
 }
+

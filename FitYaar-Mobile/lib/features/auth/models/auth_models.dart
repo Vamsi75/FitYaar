@@ -10,6 +10,9 @@ class AuthUser {
   final String? plan;
   final DateTime? until;
 
+  /// False for Google sign-ups that haven't chosen a password yet.
+  final bool hasPassword;
+
   AuthUser({
     required this.id,
     required this.email,
@@ -18,6 +21,7 @@ class AuthUser {
     this.pro = false,
     this.plan,
     this.until,
+    this.hasPassword = true,
   });
 
   factory AuthUser.fromJson(Map<String, dynamic> json) => AuthUser(
@@ -30,6 +34,7 @@ class AuthUser {
         until: json['until'] != null
             ? DateTime.tryParse(json['until'] as String)
             : null,
+        hasPassword: json['hasPassword'] as bool? ?? true,
       );
 }
 

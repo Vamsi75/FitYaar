@@ -32,6 +32,11 @@ public class User extends BaseAuditEntity {
 
     private String googleId;
 
+    /** False for Google sign-ups until they choose a password (their stored one is random). */
+    @Builder.Default
+    @Column(name = "password_set", nullable = false)
+    private boolean passwordSet = true;
+
     @Enumerated(EnumType.STRING)
     private Role role;
 

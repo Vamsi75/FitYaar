@@ -1,6 +1,7 @@
 import 'package:intl/intl.dart';
 
 import '../../core/network/api_client.dart';
+import 'import/import_models.dart';
 import 'models/workout_models.dart';
 
 /// Wraps /api/workout endpoints.
@@ -84,13 +85,15 @@ class WorkoutService {
     required DateTime startTime,
     required List<LoggedExercise> exercises,
     String? notes,
+    DateTime? endTime,
   }) async {
     final json = await _api.post('/workout/sessions',
             body: _sessionBody(
                 name: name,
                 startTime: startTime,
                 exercises: exercises,
-                notes: notes))
+                notes: notes,
+                endTime: endTime))
         as Map<String, dynamic>;
     return WorkoutSession.fromJson(json);
   }
@@ -116,16 +119,40 @@ class WorkoutService {
     await _api.delete('/workout/sessions/$sessionId');
   }
 
+  /// Attaches watch data (heart rate, zones, calories) to a session.
+  Future<HealthMetrics> saveHealthMetrics(int sessionId, HealthMetrics m) async {
+    final json = await _api.put('/workout/sessions/$sessionId/metrics', body: m.toJson())
+        as Map<String, dynamic>;
+    return HealthMetrics.fromJson(json);
+  }
+
+  /// Uploads a Hevy / Strong CSV export. [dryRun] previews without saving anything.
+  Future<WorkoutImportResult> importCsv({
+    required List<int> bytes,
+    required String filename,
+    required bool dryRun,
+    String weightUnit = 'KG',
+  }) async {
+    final json = await _api.postMultipart(
+      '/workout/import',
+      bytes: bytes,
+      filename: filename,
+      query: {'dryRun': '$dryRun', 'weightUnit': weightUnit},
+    ) as Map<String, dynamic>;
+    return WorkoutImportResult.fromJson(json);
+  }
+
   Map<String, dynamic> _sessionBody({
     required String name,
     required DateTime startTime,
     required List<LoggedExercise> exercises,
     String? notes,
+    DateTime? endTime,
   }) {
     return {
       'name': name,
       'startTime': _dateTime.format(startTime),
-      'endTime': _dateTime.format(DateTime.now()),
+      'endTime': _dateTime.format(endTime ?? DateTime.now()),
       'notes': notes,
       'exercises': [
         for (var i = 0; i < exercises.length; i++)

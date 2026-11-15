@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../widgets/google_sign_in_button.dart';
+
 import '../../../core/widgets/glass_button.dart';
 import '../../../core/widgets/glass_card.dart';
 import '../../onboarding/onboarding_screen.dart';
@@ -135,6 +137,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             loading: auth.loading,
                             onPressed: auth.loading ? null : _submit,
                           ),
+                          const GoogleSignInSection(),
                         ],
                       ),
                     ),

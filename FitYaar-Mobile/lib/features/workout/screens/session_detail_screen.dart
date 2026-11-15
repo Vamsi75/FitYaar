@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/health/health_sync_service.dart';
 import '../../../core/network/api_client.dart';
 import '../active_workout_model.dart';
 import '../metric_spec.dart';
 import '../models/workout_models.dart';
+import '../share/share_launcher.dart';
+import '../widgets/heart_rate_card.dart';
 import '../workout_service.dart';
 import 'active_workout_screen.dart';
 
@@ -87,6 +90,10 @@ class SessionDetailScreen extends StatelessWidget {
         title: Text(session.name ?? 'Workout'),
         actions: [
           IconButton(
+              icon: const Icon(Icons.ios_share),
+              tooltip: 'Share',
+              onPressed: () => shareSavedSession(context, session)),
+          IconButton(
               icon: const Icon(Icons.edit_outlined),
               tooltip: 'Edit',
               onPressed: () => _edit(context)),
@@ -104,6 +111,16 @@ class SessionDetailScreen extends StatelessWidget {
               DateFormat('EEEE, d MMM yyyy · h:mm a').format(session.startTime!),
               style: const TextStyle(color: Colors.grey),
             ),
+          if (session.isImported)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Row(children: [
+                const Icon(Icons.download_done, size: 14, color: Colors.white54),
+                const SizedBox(width: 4),
+                Text('Imported from ${session.source == 'HEVY' ? 'Hevy' : 'Strong'}',
+                    style: const TextStyle(fontSize: 12, color: Colors.white54)),
+              ]),
+            ),
           const SizedBox(height: 12),
           Row(
             children: [
@@ -114,6 +131,22 @@ class SessionDetailScreen extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
+          // Stored metrics always show. Otherwise offer a fetch for FitYaar-logged
+          // sessions, and for imported ones still inside the store's read window
+          // (people often log in Hevy/Strong while wearing a watch).
+          if (session.healthMetrics != null ||
+              !session.isImported ||
+              (session.startTime != null &&
+                  context.read<HealthSyncService>().canReadFrom(session.startTime!)))
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: WorkoutHeartRateCard(
+                sessionId: session.id,
+                start: session.startTime,
+                end: session.endTime,
+                initial: session.healthMetrics,
+              ),
+            ),
           for (final ex in session.exercises)
             Card(
               margin: const EdgeInsets.only(bottom: 12),

@@ -49,6 +49,11 @@ public class GoogleAuthService {
         if (email == null || email.isBlank()) {
             throw new BadCredentialsException("Google token has no email");
         }
+        // We sign into an existing account by matching email, so only trust addresses
+        // Google has verified (tokeninfo returns "true" as a string).
+        if (!"true".equalsIgnoreCase(claims.path("email_verified").asText())) {
+            throw new BadCredentialsException("Google email is not verified");
+        }
         String googleId = claims.path("sub").asText(null);
         String name = claims.path("name").asText(email);
 
@@ -59,6 +64,7 @@ public class GoogleAuthService {
                     .password(passwordEncoder.encode(UUID.randomUUID().toString()))
                     .role(User.Role.USER)
                     .googleId(googleId)
+                    .passwordSet(false)
                     .build();
             user.setProfile(Profile.builder().user(user).displayName(name).isPublic(true).gymVisible(true).build());
             return userRepository.save(user);

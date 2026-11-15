@@ -3,6 +3,7 @@ package com.fityaar.workout.service;
 import com.fityaar.exception.ResourceNotFoundException;
 import com.fityaar.user.entity.User;
 import com.fityaar.workout.dto.ExerciseResponse;
+import com.fityaar.workout.dto.WorkoutMetricsDto;
 import com.fityaar.workout.dto.PersonalRecordResponse;
 import com.fityaar.workout.dto.WorkoutSessionRequest;
 import com.fityaar.workout.dto.WorkoutSessionResponse;
@@ -19,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -30,6 +32,7 @@ public class WorkoutService {
     private final RoutineRepository routineRepository;
     private final PersonalRecordRepository personalRecordRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final WorkoutMetricsService metricsService;
 
     @Transactional
     public WorkoutSessionResponse startSession(User user, WorkoutSessionRequest request) {
@@ -52,7 +55,7 @@ public class WorkoutService {
         updatePersonalRecords(user, savedSession);
         // Finishing a workout auto checks the user out of any gym.
         eventPublisher.publishEvent(new WorkoutFinishedEvent(user));
-        return mapToResponse(savedSession);
+        return mapToResponse(savedSession, null);
     }
 
     @Transactional
@@ -71,7 +74,19 @@ public class WorkoutService {
 
         WorkoutSession saved = sessionRepository.save(session);
         updatePersonalRecords(user, saved);
-        return mapToResponse(saved);
+        return mapToResponse(saved, metricsService.forSession(saved.getId()).orElse(null));
+    }
+
+    /**
+     * Persists a session built by the CSV importer: computes volume and updates PRs, but does
+     * not publish {@link WorkoutFinishedEvent} (an import mustn't check the user out of a gym).
+     */
+    @Transactional
+    public WorkoutSession saveImported(User user, WorkoutSession session) {
+        session.setTotalVolume(calculateVolume(session.getExercises()));
+        WorkoutSession saved = sessionRepository.save(session);
+        updatePersonalRecords(user, saved);
+        return saved;
     }
 
     @Transactional
@@ -85,8 +100,11 @@ public class WorkoutService {
     }
 
     public List<WorkoutSessionResponse> getUserHistory(User user) {
-        return sessionRepository.findByUserOrderByStartTimeDesc(user).stream()
-                .map(this::mapToResponse)
+        List<WorkoutSession> sessions = sessionRepository.findByUserOrderByStartTimeDesc(user);
+        Map<Long, WorkoutMetricsDto> metrics = metricsService.forSessions(
+                sessions.stream().map(WorkoutSession::getId).toList());
+        return sessions.stream()
+                .map(s -> mapToResponse(s, metrics.get(s.getId())))
                 .collect(Collectors.toList());
     }
 
@@ -248,8 +266,10 @@ public class WorkoutService {
                 .sum();
     }
 
-    private WorkoutSessionResponse mapToResponse(WorkoutSession session) {
+    private WorkoutSessionResponse mapToResponse(WorkoutSession session, WorkoutMetricsDto metrics) {
         return WorkoutSessionResponse.builder()
+                .source(session.getSource() == null ? null : session.getSource().name())
+                .healthMetrics(metrics)
                 .id(session.getId())
                 .name(session.getName())
                 .routineId(session.getRoutine() != null ? session.getRoutine().getId() : null)

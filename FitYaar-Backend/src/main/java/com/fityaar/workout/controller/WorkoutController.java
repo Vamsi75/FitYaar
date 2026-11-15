@@ -6,9 +6,11 @@ import com.fityaar.workout.dto.ExerciseResponse;
 import com.fityaar.workout.dto.PersonalRecordResponse;
 import com.fityaar.workout.dto.RoutineRequest;
 import com.fityaar.workout.dto.RoutineResponse;
+import com.fityaar.workout.dto.WorkoutMetricsDto;
 import com.fityaar.workout.dto.WorkoutSessionRequest;
 import com.fityaar.workout.dto.WorkoutSessionResponse;
 import com.fityaar.workout.service.RoutineService;
+import com.fityaar.workout.service.WorkoutMetricsService;
 import com.fityaar.workout.service.WorkoutService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +27,7 @@ public class WorkoutController {
 
     private final WorkoutService workoutService;
     private final RoutineService routineService;
+    private final WorkoutMetricsService metricsService;
 
     @GetMapping("/exercises")
     public ResponseEntity<List<ExerciseResponse>> searchExercises(
@@ -88,6 +91,23 @@ public class WorkoutController {
             @PathVariable Long id,
             @AuthenticationPrincipal UserPrincipal principal) {
         workoutService.deleteSession(principal.getUser(), id);
+        return ResponseEntity.noContent().build();
+    }
+
+    /** Attach / replace wearable data (heart rate, zones, calories) for one of my sessions. */
+    @PutMapping("/sessions/{id}/metrics")
+    public ResponseEntity<WorkoutMetricsDto> putMetrics(
+            @PathVariable Long id,
+            @Valid @RequestBody WorkoutMetricsDto request,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return ResponseEntity.ok(metricsService.upsert(principal.getUser(), id, request));
+    }
+
+    @DeleteMapping("/sessions/{id}/metrics")
+    public ResponseEntity<Void> deleteMetrics(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        metricsService.delete(principal.getUser(), id);
         return ResponseEntity.noContent().build();
     }
 

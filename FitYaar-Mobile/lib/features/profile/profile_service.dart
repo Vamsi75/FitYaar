@@ -60,6 +60,11 @@ class ProfileService {
     return ProfileData.fromJson(json);
   }
 
+  /// First password for a Google sign-up (no current password).
+  Future<void> setPassword(String newPassword) async {
+    await _api.post('/users/set-password', body: {'newPassword': newPassword});
+  }
+
   Future<void> changePassword(String currentPassword, String newPassword) async {
     await _api.post('/users/change-password', body: {
       'currentPassword': currentPassword,

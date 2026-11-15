@@ -17,6 +17,10 @@ public interface WorkoutSessionRepository extends JpaRepository<WorkoutSession, 
     List<WorkoutSession> findByUserInAndStartTimeAfter(List<User> users, LocalDateTime after);
     long countByUser(User user);
 
+    /** Start times of all of a user's sessions — duplicate detection for CSV import. */
+    @Query("SELECT w.startTime FROM WorkoutSession w WHERE w.user = :user")
+    List<LocalDateTime> startTimesForUser(@Param("user") User user);
+
     // --- Super-admin console (platform engagement metrics) ---
 
     long countByStartTimeAfter(LocalDateTime after);

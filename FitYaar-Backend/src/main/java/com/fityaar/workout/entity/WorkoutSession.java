@@ -41,5 +41,15 @@ public class WorkoutSession extends BaseAuditEntity {
     private List<WorkoutExercise> exercises;
 
     private Integer totalVolume;
+
+    /** Where the session came from: logged in FitYaar, or imported from another app's CSV. */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private Source source = Source.FITYAAR;
+
+    public enum Source {
+        FITYAAR, HEVY, STRONG
+    }
 }
 

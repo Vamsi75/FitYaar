@@ -42,9 +42,26 @@ class AuthProvider extends ChangeNotifier {
         token != null ? AuthStatus.authenticated : AuthStatus.unauthenticated;
     if (token != null) {
       _authService.registerPush();
-      refreshEntitlements();
+      refreshUser();
     }
     notifyListeners();
+  }
+
+  /// Loads the signed-in user (name, id, role, Pro) from the backend. Called on a
+  /// cold start — the stored token alone doesn't say who you are — and after the
+  /// profile is edited so the greeting picks up a new name.
+  Future<void> refreshUser() async {
+    try {
+      final u = await _authService.fetchMe();
+      _user = u;
+      _pro = u.pro;
+      _proPlan = u.plan;
+      _proUntil = u.until;
+      notifyListeners();
+    } on ApiException catch (e) {
+      // Token rejected even after the client's refresh attempt → sign out cleanly.
+      if (e.statusCode == 401) await logout();
+    } catch (_) {/* offline: keep the session, try again next start */}
   }
 
   /// Re-fetch Pro from the backend (after a grant / gym-plan change).
@@ -69,6 +86,31 @@ class AuthProvider extends ChangeNotifier {
             displayName: displayName,
           ));
 
+  /// Google sign-in. Closing the account picker isn't an error.
+  Future<bool> loginWithGoogle() async {
+    _loading = true;
+    _error = null;
+    notifyListeners();
+    try {
+      final res = await _authService.loginWithGoogle();
+      if (res == null) {
+        _loading = false;
+        notifyListeners();
+        return false;
+      }
+      _apply(res);
+      return true;
+    } on ApiException catch (e) {
+      _error = e.message;
+    } catch (e) {
+      debugPrint('Google sign-in failed: $e');
+      _error = 'Google sign-in didn\'t work. Try again, or use your email.';
+    }
+    _loading = false;
+    notifyListeners();
+    return false;
+  }
+
   Future<void> logout() async {
     await _authService.logout();
     _user = null;
@@ -79,20 +121,23 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  void _apply(AuthResponse res) {
+    _user = res.user;
+    _pro = res.user.pro;
+    _proPlan = res.user.plan;
+    _proUntil = res.user.until;
+    _status = AuthStatus.authenticated;
+    _loading = false;
+    _authService.registerPush();
+    notifyListeners();
+  }
+
   Future<bool> _run(Future<AuthResponse> Function() action) async {
     _loading = true;
     _error = null;
     notifyListeners();
     try {
-      final res = await action();
-      _user = res.user;
-      _pro = res.user.pro;
-      _proPlan = res.user.plan;
-      _proUntil = res.user.until;
-      _status = AuthStatus.authenticated;
-      _loading = false;
-      _authService.registerPush();
-      notifyListeners();
+      _apply(await action());
       return true;
     } on ApiException catch (e) {
       _error = e.message;

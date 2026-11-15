@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../widgets/google_sign_in_button.dart';
+
 import '../../../core/widgets/glass_button.dart';
 import '../../../core/widgets/glass_card.dart';
 import '../auth_provider.dart';
@@ -88,8 +90,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             controller: _password,
                             obscureText: _obscure,
                             decoration: glassField(context,
-                                    label: 'Password',
-                                    icon: Icons.lock_outline)
+                                    label: 'Password', icon: Icons.lock_outline)
                                 .copyWith(
                               suffixIcon: IconButton(
                                 icon: Icon(
@@ -115,6 +116,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             loading: auth.loading,
                             onPressed: auth.loading ? null : _submit,
                           ),
+                          const GoogleSignInSection(),
                         ],
                       ),
                     ),

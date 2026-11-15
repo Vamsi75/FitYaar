@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/widgets/glass_card.dart';
 import '../auth/auth_provider.dart';
@@ -93,7 +94,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (_profile == null) return;
     final saved = await Navigator.of(context).push<bool>(
         MaterialPageRoute(builder: (_) => EditProfileScreen(current: _profile!)));
-    if (saved == true) _load();
+    if (saved == true) {
+      _load();
+      if (mounted) context.read<AuthProvider>().refreshUser(); // new name → Home greeting
+    }
   }
 
   Future<void> _openSettings() async {
@@ -102,16 +106,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _load();
   }
 
+  /// Invite a friend: opens the share sheet (WhatsApp, Instagram…) with a short
+  /// message. Points at fityaar.com until public profile pages (/u/…) exist.
   Future<void> _share() async {
-    final name = _profile?.displayName ?? 'A FitYaar athlete';
-    final bio = _profile?.bio;
-    await Clipboard.setData(ClipboardData(
-        text: '$name on FitYaar${bio != null && bio.isNotEmpty ? '\n$bio' : ''}'
-            '\nfityaar.app/u/me'));
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Profile link copied to clipboard')));
-    }
+    final name = _profile?.displayName ??
+        context.read<AuthProvider>().user?.displayName ??
+        'me';
+    final box = context.findRenderObject() as RenderBox?;
+    await SharePlus.instance.share(ShareParams(
+      subject: 'Train with me on FitYaar',
+      text: "Let's work out together on FitYaar! 💪\n"
+          'Track workouts, share PRs and keep each other on streak. '
+          'Find me as "$name" in the app.\n'
+          'https://fityaar.com',
+      sharePositionOrigin:
+          box == null ? null : box.localToGlobal(Offset.zero) & box.size,
+    ));
   }
 
   DateTime _rangeStart() {
@@ -214,6 +224,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ],
           ),
+          if (_links(p).isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Wrap(spacing: 8, runSpacing: 8, children: _links(p)),
+          ],
           const SizedBox(height: 16),
           FutureBuilder<SocialCounts>(
             future: _counts,
@@ -232,6 +246,57 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
   }
+
+  /// Instagram / website chips (tap to open). Accepts "@handle", "handle" or a URL.
+  List<Widget> _links(ProfileData? p) {
+    final out = <Widget>[];
+    final ig = p?.instagram?.trim() ?? '';
+    if (ig.isNotEmpty) {
+      final handle = ig
+          .replaceFirst(RegExp(r'^https?://(www\.)?instagram\.com/', caseSensitive: false), '')
+          .replaceAll('@', '')
+          .replaceAll('/', '');
+      if (handle.isNotEmpty) {
+        out.add(_linkChip(Icons.camera_alt_outlined, '@$handle',
+            'https://instagram.com/$handle'));
+      }
+    }
+    final web = p?.website?.trim() ?? '';
+    if (web.isNotEmpty) {
+      final url = web.startsWith(RegExp(r'https?://', caseSensitive: false))
+          ? web
+          : 'https://$web';
+      final label = web
+          .replaceFirst(RegExp(r'^https?://(www\.)?', caseSensitive: false), '')
+          .replaceFirst(RegExp(r'/$'), '');
+      out.add(_linkChip(Icons.link, label, url));
+    }
+    return out;
+  }
+
+  Widget _linkChip(IconData icon, String label, String url) => InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: () => launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(icon, size: 14, color: Colors.white70),
+            const SizedBox(width: 6),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 200),
+              child: Text(label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12, color: Colors.white)),
+            ),
+          ]),
+        ),
+      );
 
   Widget _countButton(String count, String label, bool showFollowers) {
     return InkWell(
